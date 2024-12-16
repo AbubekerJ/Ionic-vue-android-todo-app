@@ -1,12 +1,14 @@
 <template>
   <ion-page>
+     
     <ion-header :translucent="true">
       <ion-toolbar>
-        <ion-title>
+        <ion-title class="ion-justify-content-between">
           <div class="flex items-center gap-2">
             <img src="/et-logo.png" alt="Logo" style="height: 40px" />
             <h1>Ethiotelcom</h1>
           </div>
+          <router-link to="/login">Login </router-link>
         </ion-title>
       </ion-toolbar>
     </ion-header>
@@ -15,9 +17,15 @@
       <ion-header collapse="condense">
         <ion-toolbar>
           <ion-title size="large">Ethiotelcom</ion-title>
+       
         </ion-toolbar>
       </ion-header>
 
+
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+      <ion-refresher-content></ion-refresher-content>
+    </ion-refresher>
+    
       <ion-card class="ion-margin-top">
         <ion-card-header>
           <ion-card-title>Task Manager</ion-card-title>
@@ -45,30 +53,31 @@
             >Add Task</ion-button
           >
         </form>
-
         <ion-list>
-          <ion-item v-for="(t, index) in task" :key="index">
-            <ion-label>{{ t.title }}</ion-label>
-            <ion-buttons slot="end">
-              <ion-button
-                id="open-loading"
-                color="danger"
-                @click="handleDelete(t)"
-                >Delete</ion-button
-              >
+          <ion-card>
+            <ion-card-content>
+              <ion-item v-for="(t, index) in task" :key="index">
+                <ion-label>{{ t.title }}</ion-label>
 
-              <ion-loading
-                trigger="open-loading"
-                :duration="3000"
-                message="Deleting Task"
-              >
+                <ion-button
+                  slot="end"
+                  id="open-loading-delete"
+                  color="danger"
+                  @click="handleDelete(t)"
+                  >Delete</ion-button
+                >
 
-              </ion-loading>
-              <ion-button color="primary" @click="handleEdit(t.title, index)"
-                >Edit</ion-button
-              >
-            </ion-buttons>
-          </ion-item>
+              
+                <ion-button
+                  slot="end"
+                  color="primary"
+                  @click="handleEdit(t.title, index)"
+
+                  >Edit</ion-button
+                >
+              </ion-item>
+            </ion-card-content>
+          </ion-card>
         </ion-list>
 
         <ion-modal
@@ -94,12 +103,7 @@
               @click="handleUpdate"
               >Update</ion-button
             >
-            <ion-loading
-                trigger="open-loading-update"
-                :duration="3000"
-                message="Updating Task"
-              >
-            </ion-loading>
+          
             <ion-button
               expand="block"
               color="medium"
@@ -122,52 +126,57 @@ import {
   IonTitle,
   IonToolbar,
   IonInput,
-  IonButtons,
   IonItem,
   IonModal,
   IonLabel,
   IonButton,
   IonList,
-  IonLoading,
-} from "@ionic/vue";
-import { ref, onMounted } from "vue";
-import axios from "axios";
-import {
+  loadingController,
   IonCard,
   IonCardContent,
   IonCardHeader,
   IonCardSubtitle,
   IonCardTitle,
+  IonRefresher,
+   IonRefresherContent
+  
 } from "@ionic/vue";
+import { ref,onMounted } from "vue";
+
+
+import axios from "axios";
+
 
 interface Task {
   id: number;
   title: string;
 }
-import type { Ref } from 'vue'
 
-const task:Ref<Task[]> =  ref([]);
-const newTask:Ref<string> = ref("");
-const editTask:Ref<string> = ref("");
-const editingIndex:Ref<number | null>= ref(null);
-const isModalOpen :Ref<boolean> = ref(false);
 
-onMounted(async () => {
-  const response = await axios.get(
+const task = ref<Task[]>([]);
+const newTask = ref<string>("");
+const editTask = ref<string>("");
+const editingIndex= ref<any> (null);
+const isModalOpen = ref<boolean>(false);
+
+const fetchDate = async()=>{
+    const response = await axios.get(
     "https://675c2955fe09df667f62db95.mockapi.io/todo/todos"
   );
   task.value = response.data;
+  }
+onMounted(async() => {
+  await fetchDate()
 });
 
 const handleSubmit = async () => {
-
   if (newTask.value.trim() !== "") {
     try {
       const response = await axios.post(
         "https://675c2955fe09df667f62db95.mockapi.io/todo/todos",
         { title: newTask.value }
       );
-     
+
       task.value.push(response.data);
       newTask.value = "";
     } catch (error) {
@@ -186,7 +195,12 @@ const closeModal = () => {
 };
 
 const handleUpdate = async () => {
-  if (editTask.value.trim() !== ""  && editingIndex.value !== null) {
+  if (editTask.value.trim() !== "" && editingIndex.value !== null) {
+
+    const loading = await loadingController.create({
+    message: 'Updating Task...',
+  });
+  await loading.present();
     try {
       const updatedTask = {
         ...task.value[editingIndex.value],
@@ -200,11 +214,18 @@ const handleUpdate = async () => {
       closeModal();
     } catch (error) {
       console.error("Error updating task:", error);
-    }
+    }finally {
+    loading.dismiss();
+  }
   }
 };
 
 const handleDelete = async (t: Task) => {
+  const loading = await loadingController.create({
+    message: 'Deleting Task...',
+  });
+  await loading.present();
+
   try {
     await axios.delete(
       `https://675c2955fe09df667f62db95.mockapi.io/todo/todos/${t.id}`
@@ -212,6 +233,20 @@ const handleDelete = async (t: Task) => {
     task.value = task.value.filter((taskItem: Task) => taskItem.id !== t.id);
   } catch (error) {
     console.error("Error deleting task:", error);
+  } finally {
+    loading.dismiss();
   }
 };
+
+
+const handleRefresh =async (event: CustomEvent)=>{
+  try {
+    await fetchDate()
+  } catch (error) {
+    console.log(error)
+  }finally{
+    (event.target as HTMLIonRefresherElement).complete()
+  }
+}
+
 </script>
